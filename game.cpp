@@ -1,84 +1,212 @@
 #include <iostream>
 #include <map>
+#include <vector>
+#include <algorithm>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
+const int SCREEN_WIDTH = 800;
+const int SCREEN_HEIGHT = 600;
+const int TANK_WIDTH = 50;
+const int TANK_HEIGHT = 50;
+const int BULLET_WIDTH = 10;
+const int BULLET_HEIGHT = 10;
+const int BULLET_SPEED = 5;
 
-int main() {
-    std::cout << "Connected to server!" << std::endl;
+struct Tank {
+    int x, y;
+    int health = 10;
+    SDL_Color color;
+};
+#pragma pack(pop)
 
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *window = SDL_CreateWindow("Tank Battle", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+struct Bullet {
+    int x, y;
+    int speedX;
+};
 
-    int rect_pos_y = 100;
-    int enemy_rect_pos_y = 100;
-    int bullet_pos_y;
-    int bullet_pos_x;
-    
-    bool running = true;
-    std::map<int, bool> keyboard;
-    while (running) {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            }
-            if (event.type == SDL_KEYDOWN) {
-                
-                if (event.key.keysym.sym == SDLK_w) {
-                    keyboard[event.key.keysym.sym] = false;
-                    std::cout << "w" << "\n";
-                    rect_pos_y -= 10;
-                    break;
-                }
-                if (event.key.keysym.sym == SDLK_s) {
-                    keyboard[event.key.keysym.sym] = true;
-                    std::cout << "s" << "\n";
-                    rect_pos_y += 10;
-                    break;
-                }
-                if (event.key.keysym.sym == SDLK_d) {
-                    keyboard[event.key.keysym.sym] = true;
-                    std::cout << "d" << "\n";
-                    bullet_pos_y = rect_pos_y;
-                    bullet_pos_x = 50;
-                    while (bullet_pos_x != 400) {
-                        bullet_pos_x++;
-                        SDL_Rect bullet = {bullet_pos_x, bullet_pos_y, 100, 100};
-                        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                        SDL_RenderFillRect(renderer, &bullet);
-                    }
-                    break;
-                }
-                if (event.key.keysym.sym == SDLK_UP) {
-                        keyboard[event.key.keysym.sym] = false;
-                        std::cout << "w" << "\n";
-                        enemy_rect_pos_y -= 10;
-                        break;
-                }
-                if (event.key.keysym.sym == SDLK_DOWN) {
-                        keyboard[event.key.keysym.sym] = true;
-                        std::cout << "s" << "\n";
-                        enemy_rect_pos_y += 10;
-                        break;
-                }
-            }
-            
-            SDL_Rect tank = {0, rect_pos_y, 50, 50};
-            
-            SDL_Rect enemy_tank = {400, enemy_rect_pos_y, 50, 50};
+void DrawTank(SDL_Renderer* renderer, const Tank& tank) {
+    SDL_Rect rect = {tank.x, tank.y, TANK_WIDTH, TANK_HEIGHT};
+    SDL_SetRenderDrawColor(renderer, tank.color.r, tank.color.g, tank.color.b, 255);
+    SDL_RenderFillRect(renderer, &rect);
+}
 
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-            SDL_RenderClear(renderer);
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-            SDL_RenderFillRect(renderer, &tank);
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-            SDL_RenderFillRect(renderer, &enemy_tank);
-            SDL_RenderPresent(renderer);
+void DrawBullet(SDL_Renderer* renderer, const Bullet& bullet) {
+    SDL_Rect rect = {bullet.x, bullet.y, BULLET_WIDTH, BULLET_HEIGHT};
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &rect);
+}
+
+void DrawText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text,
+              int x, int y, SDL_Color color) {
+    SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_Rect dst = {x, y, surface->w, surface->h};
+    SDL_RenderCopy(renderer, texture, nullptr, &dst);
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+
+bool CheckCollision(const Bullet& bullet, const Tank& tank) {
+    SDL_Rect bulletRect = {bullet.x, bullet.y, BULLET_WIDTH, BULLET_HEIGHT};
+    SDL_Rect tankRect = {tank.x, tank.y, TANK_WIDTH, TANK_HEIGHT};
+    return SDL_HasIntersection(&bulletRect, &tankRect);
+}
+
+void HandleEvents(bool& running, std::map<SDL_Keycode, bool>& keys) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) running = false;
+        else if (event.type == SDL_KEYDOWN) keys[event.key.keysym.sym] = true;
+        else if (event.type == SDL_KEYUP) keys[event.key.keysym.sym] = false;
+    }
+}
+
+void ProcessInput(std::map<SDL_Keycode, bool>& keys, Tank& player, Tank& enemy,
+                  std::vector<Bullet>& bulletsPlayer, std::vector<Bullet>& bulletsEnemy) {
+    if (keys[SDLK_w]) {
+        if (player.y != 0) {
+            player.y -= 5;
         }
     }
+    if (keys[SDLK_s]) {
+        if (player.y != 550) {
+            player.y += 5;
+        }
+    }
+    if (keys[SDLK_UP]) {
+        if (enemy.y != 0) {
+            enemy.y -= 5;
+        }
+    }
+    if (keys[SDLK_DOWN]) {
+        if (enemy.y != 550) {
+            enemy.y += 5;
+        }
+    }
+
+    if (keys[SDLK_d]) {
+        bulletsPlayer.push_back(Bullet{
+            player.x + TANK_WIDTH,
+            player.y + TANK_HEIGHT / 2 - BULLET_HEIGHT / 2,
+            BULLET_SPEED
+        });
+        keys[SDLK_d] = false;
+    }
+
+    if (keys[SDLK_LEFT]) {
+        bulletsEnemy.push_back(Bullet{
+            enemy.x - BULLET_WIDTH,
+            enemy.y + TANK_HEIGHT / 2 - BULLET_HEIGHT / 2,
+            -BULLET_SPEED
+        });
+        keys[SDLK_LEFT] = false;
+    }
+
+    if (keys[SDLK_d]) {
+        bulletsPlayer.push_back(Bullet{
+            player.x + TANK_WIDTH,
+            player.y + TANK_HEIGHT / 2 - BULLET_HEIGHT / 2,
+            BULLET_SPEED
+        });
+        keys[SDLK_d] = false;
+    }
+
+    if (keys[SDLK_LEFT]) {
+        bulletsEnemy.push_back(Bullet{
+            enemy.x - BULLET_WIDTH,
+            enemy.y + TANK_HEIGHT / 2 - BULLET_HEIGHT / 2,
+            -BULLET_SPEED
+        });
+        keys[SDLK_LEFT] = false;
+    }
+}
+
+void UpdateBullets(std::vector<Bullet>& bullets, Tank& target) {
+    for (auto& b : bullets) {
+        b.x += b.speedX;
+    }
+
+    bullets.erase(
+        std::remove_if(bullets.begin(), bullets.end(),
+            [&](const Bullet& b) {
+                if (CheckCollision(b, target)) {
+                    if (target.health > 0) {
+                        target.health--;
+                        std::cout << target.health << std::endl;
+                    }
+                    return true;
+                }
+                return (b.x < 0 || b.x > SCREEN_WIDTH);
+            }),
+        bullets.end()
+    );
+}
+
+int main() {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        std::cerr << "SDL Init Error: " << SDL_GetError() << "\n";
+        return 1;
+    }
+
+    if (TTF_Init() != 0) {
+        std::cerr << "TTF Init Error: " << TTF_GetError() << "\n";
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("Tank Battle",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24);
+    if (!font) {
+        std::cerr << "Failed to load font\n";
+        return 1;
+    }
+
+    // ------ TANKS
+    Tank player = {50, 100, 10, {0, 255, 0}};
+    Tank enemy = {SCREEN_WIDTH - TANK_WIDTH - 50, 100, 10, {255, 0, 0}};
+
+    std::vector<Bullet> bulletsPlayer;
+    std::vector<Bullet> bulletsEnemy;
+    std::map<SDL_Keycode, bool> keys;
+
+    bool running = true;
+
+    while (running) {
+        HandleEvents(running, keys);
+        ProcessInput(keys, player, enemy, bulletsPlayer, bulletsEnemy);
+
+        UpdateBullets(bulletsPlayer, enemy);
+        UpdateBullets(bulletsEnemy, player);
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
+        DrawTank(renderer, player);
+        DrawTank(renderer, enemy);
+
+        for (auto& b : bulletsPlayer) {
+            DrawBullet(renderer, b);
+        }
+        for (auto& b : bulletsEnemy) {
+            DrawBullet(renderer, b);
+        }
+
+        SDL_Color white = {255, 255, 255};
+        DrawText(renderer, font, "Player1 HP: " + std::to_string(player.health), 10, 10, white);
+        DrawText(renderer, font, "Player2 HP: " + std::to_string(enemy.health), SCREEN_WIDTH - 200, 10, white);
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+    }
+
+    TTF_CloseFont(font);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    TTF_Quit();
     SDL_Quit();
     return 0;
 }
