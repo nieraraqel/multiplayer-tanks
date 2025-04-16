@@ -18,7 +18,6 @@ struct Tank {
     int health = 10;
     SDL_Color color;
 };
-#pragma pack(pop)
 
 struct Bullet {
     int x, y;
