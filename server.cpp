@@ -55,7 +55,7 @@ void Handle_Client(int client_socket, int client_id) {
                 myTank.y + TANK_HEIGHT / 2 - BULLET_HEIGHT / 2,
                 bulletDir
             });
-            //std::cout << myBullets.getsize() << std::endl;
+            std::cout << myBullets.getsize() << std::endl;
         }
     }
 }
