@@ -24,7 +24,7 @@ const int BULLET_WIDTH = 10;
 const int BULLET_HEIGHT = 10;
 
 
-int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+int server_socket = socket(AF_INET, SOCK_DGRAM, 0);
 
 void Socket_Init() {
     struct sockaddr_in server_address;
@@ -77,7 +77,7 @@ void Process_Input(std::map<SDL_Keycode, bool>& keys) {
     }
 }
 
-void Draw_Tank(SDL_Renderer* renderer, SDL_Texture* texture, int x, int y, SDL_Color color, int index) {
+void Draw_Tank(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Color color, int x, int y, int index) {
     SDL_Rect srcRect = {index * 16, 0, 16, 16};
     SDL_Rect dstRect = {x, y, TANK_WIDTH, TANK_HEIGHT};
     SDL_RenderCopy(renderer, texture, &srcRect, &dstRect);
@@ -160,8 +160,8 @@ int main() {
         SDL_Color player_color = {0, 255, 0};
         SDL_Color enemy_color = {255, 0, 0};
 
-        Draw_Tank(renderer, texture, player_x, data.player.y, player_color, 0);
-        Draw_Tank(renderer, texture, enemy_x, data.enemy.y, enemy_color, 1);
+        Draw_Tank(renderer, texture, player_color, player_x, data.player.y, 0);
+        Draw_Tank(renderer, texture, enemy_color, enemy_x, data.enemy.y, 1);
 
         for (size_t i = 0; i < data.bullets.getsize(); ++i) {
             if (data.bullets[i].x == 0 && data.bullets[i].y == 0) continue;
